@@ -15,6 +15,7 @@ app.use(express.static('public'));
 
 // Routes
 app.use('/', require('./routes/indexRoutes'));
+app.use('/', require('./routes/loginRoutes'));
 
 
 // HTTP server
