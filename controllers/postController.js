@@ -1,170 +1,191 @@
 const Post = require("../models/Post");
 const Student = require("../models/Student");
-const { multer, uploadFileToGCS } = require("../utils/uploadHelper");
 
-// Multer middleware for optional image upload
-const uploadPostImageMiddleware = multer.single("image");
-
-const createPost = async (req, res) => {
+const addPost = async (req, res) => {
   try {
-    const { userId, postName, description, tags } = req.body;
+    const { userId } = req.params;
+    const { postName, description, tags } = req.body;
 
-    if (!userId || !postName || !description) {
+    if (!userId || !postName || !description || !tags) {
       return res.status(400).json({
-        success: false,
-        message: "userId, postName, and description are required",
+        status: false,
+        message: "all field are required",
       });
     }
 
     const student = await Student.findById(userId);
     if (!student) {
       return res.status(404).json({
-        success: false,
-        message: "Student not found",
+        status: false,
+        message: "student not found",
       });
     }
 
-    let imageUrl = "";
-
-    // Optional Image Upload
-    if (req.file) {
-      const allowedFormats = [
-        "image/bmp",
-        "image/gif",
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-      ];
-
-      if (!allowedFormats.includes(req.file.mimetype)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid image format. Allowed: BMP, GIF, JPEG, PNG, WebP",
-        });
-      }
-
-      imageUrl = await uploadFileToGCS(req.file);
-    }
-
-    let tagsArray = [];
-    if (tags) {
-      try {
-        tagsArray = JSON.parse(tags); 
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: "Tags must be a valid JSON array",
-        });
-      }
-    }
-
-    // Create new post
-    const newPost = new Post({
+    const post = new Post({
       userId,
       postName,
       description,
-      uploadTime: Date.now(),
-      tags: tagsArray,
-      imageUrl,
+      tags,
     });
 
-    await newPost.save();
-
+    await post.save();
     return res.status(201).json({
-      success: true,
-      message: "Post created successfully",
-        post: newPost,
-
+      status: true,
+      message: "post added successfully",
+      post,
     });
-
   } catch (error) {
     return res.status(500).json({
-      success: false,
-      message: "Server error while creating post",
+      status: false,
+      message: "error while adding post",
       error: error.message,
     });
   }
 };
 
+const getPostsByUserId = async (req,res) =>{
 
-const getPosts = async (req, res) => {
   try {
-    const {
-      searchText,
-      startDate,
-      endDate,
-      tags,
-      page = 1,
-      limit = 10
-    } = req.query;
-
-    
-
-    const filter = {};
-
-    //Search text in postName or description
-    if (searchText) {
-      filter.$or = [
-        { postName: { $regex: searchText, $options: "i" } },
-        { description: { $regex: searchText, $options: "i" } }
-      ];
+    const {userId} =req.params;
+    if (!userId){
+      return res.status(400).json({
+        status:false,
+        message:"userId is required"
+      });
     }
 
-    //Date range filter
-    if (startDate || endDate) {
-      filter.uploadTime = {};
-      if (startDate) filter.uploadTime.$gte = new Date(startDate);
-      if (endDate) filter.uploadTime.$lte = new Date(endDate);
+    const post =await Post.find({userId});
+    if (!post){
+      return res.status(404).json({
+        status:false,
+        message:"post not found"
+      });
     }
+   
+    return res.status(200).json({
+      status:true,
+      message:"post fetched successfully",
+      post
+    });
+  }
+  catch (error){
+    return res.status(500).json({
+      status:false,
+      message:"error while fetching data",
+      error: error.message
+    })
+  }
 
-    // Tag filter
-    if (tags) {
-      let parsedTags = [];
+}
 
-      try {
-        parsedTags = JSON.parse(tags); 
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid tags format. Expected JSON array string."
-        });
-      }
+const getAllPosts = async (req, res) =>{
 
-      filter.tags = { $in: parsedTags };
+  try{
+    const posts = await Post.find();
+
+    if(posts.length===0){
+      return res.status(404).json({
+        status:false,
+        message:"no posts found"
+      });
     }
-
-    // Pagination
-    const skip = (page - 1) * limit;
-
-    const posts = await Post.find(filter)
-      .sort({ uploadTime: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-
-    console.log("Post Filter Response:", posts);
 
     return res.status(200).json({
-      success: true,
-      message: "Posts fetched successfully",
-      page: Number(page),
-      limit: Number(limit),
-      total: posts.length,
+      status:true,
+      message:"posts fetched successfully",
       posts
     });
 
-  } catch (error) {
-    console.error("Fetch Posts Error:", error);
+  }
+  catch (error){
     return res.status(500).json({
-      success: false,
-      message: "Server error while fetching posts",
+      status:false,
+      message:"error while fetching all posts",
       error: error.message
+    })
+  }
+}
+
+const deletePost = async(req, res) =>{
+
+  try{
+
+    const {postId} = req.params;
+
+    if (!postId){
+      return res.status(400).json({
+        status:false,
+        message:"postId is required"
+      });
+    }
+
+    const post = await Post.findByIdAndDelete(postId);
+
+    if (!post){
+      return res.status(404).json({
+        status:false,
+        message:"post not found"
+      });
+    }
+    return res.status(200).json({
+      status:true,
+      message:"post deleted successfully",
+      post
+    });
+
+  }catch (error){
+    return res.status(500).json({
+      status:false,
+      message:"error while deleting post",
+      error: error.message
+    })
+  }
+}
+
+const editPost = async (req, res) => {
+
+  try {
+    const { postId } = req.params;
+    const { postName, description, tags } = req.body;
+
+    if (!postId) {
+      return res.status(400).json({
+        status: false,
+        message: "postId is required",
+      });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({
+        status: false,
+        message: "post not found",
+      });
+    }
+
+    // update fields if provided
+    if (postName) post.postName = postName;
+    if (description) post.description = description;
+    if (tags) post.tags = tags;
+
+    await post.save();
+
+    return res.status(200).json({
+      status: true,
+      message: "post updated successfully",
+      post,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "error while editing post",
+      error: error.message,
     });
   }
-};
-
-
-module.exports = {
-  uploadPostImageMiddleware,
-  createPost,
-  getPosts
+}
+module.exports = { addPost, 
+  getPostsByUserId, 
+  getAllPosts, 
+  deletePost, 
+  editPost 
 };

@@ -4,7 +4,7 @@ const postSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",   // Reference to Student Schema
+      ref: "Student", 
       required: true,
     },
 
@@ -20,20 +20,11 @@ const postSchema = new mongoose.Schema(
       trim: true,
     },
 
-    uploadTime: {
-      type: Date,
-      default: Date.now,
-    },
-
     tags: {
-      type: [String],   // Array of Strings
-      default: [],
-    },
-
-    imageUrl: {
       type: String,
       default: "",
     },
+
   },
   { timestamps: true }
 );
