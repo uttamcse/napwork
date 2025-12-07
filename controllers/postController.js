@@ -188,4 +188,5 @@ module.exports = { addPost,
   getAllPosts, 
   deletePost, 
   editPost 
+  
 };
